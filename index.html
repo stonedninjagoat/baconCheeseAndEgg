@@ -1,46 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Rhythm Notation Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone@next"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-    h1 { margin-bottom: 10px; }
-    .track { margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-    pre { background: #f0f0f0; padding: 10px; border-radius: 4px; }
+    body { font-family: sans-serif; text-align: center; margin-top: 30px; }
+    .track { margin: 10px auto; width: 80%; border: 1px solid #ccc; border-radius: 8px; padding: 10px; }
+    pre { background: #f9f9f9; padding: 10px; border-radius: 5px; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
   </style>
 </head>
 <body>
   <h1>Rhythm Notation Tool</h1>
-  <p>Press <strong>Space</strong> (Track 1), <strong>CapsLock</strong> (Track 2), or <strong>Enter</strong> (Track 3) to record rhythm.<br>
-     Press <strong>Backspace</strong> to reset.</p>
+  <p>
+    Press <strong>Space</strong> (Track 1), <strong>CapsLock</strong> (Track 2), or <strong>Enter</strong> (Track 3) to tap rhythms.<br>
+    Press <strong>Backspace</strong> to reset. <br>
+    <button onclick="exportMIDI()">Export as MIDI</button>
+  </p>
 
   <div id="output"></div>
 
   <script>
-    // allow export as midi, display results 
-    
     const tracks = {
-      'Space': { times: [], name: "Track 1" },
-      'CapsLock': { times: [], name: "Track 2" },
-      'Enter': { times: [], name: "Track 3" }
+      'Space': { times: [], name: "Track 1", midi: 60 },
+      'CapsLock': { times: [], name: "Track 2", midi: 64 },
+      'Enter': { times: [], name: "Track 3", midi: 67 }
     };
 
-    const durations = [1, 0.5, 0.33, 0.25, 0.125]; //change to if dividable by 2 or 3
+    const baseNote = 1; // 1 = whole note
+    const possibleDurations = [
+      1,        // whole
+      0.75,     // dotted half
+      0.5,      // half
+      0.375,    // dotted quarter
+      0.33,     // triplet quarter
+      0.25,     // quarter
+      0.1875,   // dotted 8th
+      0.166,    // triplet 8th
+      0.125     // 8th
+    ];
 
     function closestDuration(val) {
-      return durations.reduce((prev, curr) =>
-        Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev
+      return possibleDurations.reduce((a, b) =>
+        Math.abs(b - val) < Math.abs(a - val) ? b : a
       );
     }
 
     function getIntervals(times) {
-      let intervals = [];
+      const intervals = [];
       for (let i = 1; i < times.length; i++) {
-        let raw = (times[i] - times[i - 1]) / 1000; // seconds
-        intervals.push(closestDuration(raw));
+        const delta = (times[i] - times[i - 1]) / 1000; // in seconds
+        intervals.push(closestDuration(delta));
       }
       return intervals;
+    }
+
+    function toJianpuSymbol(duration) {
+      let symbol = "X";
+      if (Math.abs(duration - 0.33) < 0.02 || Math.abs(duration - 0.166) < 0.02) {
+        return "XT"; // triplet
+      }
+      if (Math.abs(duration - 0.75) < 0.02 || Math.abs(duration - 0.375) < 0.02 || Math.abs(duration - 0.1875) < 0.02) {
+        symbol += ".";
+        duration /= 1.5;
+      }
+      if (duration === 0.5) return symbol + "_";
+      if (duration === 0.25) return symbol + "__";
+      if (duration === 0.125) return symbol + "___";
+      return symbol;
     }
 
     function renderOutput() {
@@ -48,7 +76,13 @@
       for (const key in tracks) {
         const t = tracks[key];
         const intervals = getIntervals(t.times);
-        out += `<div class="track"><strong>${t.name}</strong><br><pre>${intervals.join(' - ') || 'No input yet'}</pre></div>`;
+        const jianpu = intervals.map(toJianpuSymbol).join(" ");
+        out += `
+          <div class="track">
+            <strong>${t.name}</strong><br>
+            <pre>Durations: ${intervals.join(" - ") || "No input yet"}
+Jianpu: ${jianpu || "No input yet"}</pre>
+          </div>`;
       }
       document.getElementById("output").innerHTML = out;
     }
@@ -67,7 +101,24 @@
         renderOutput();
       }
     });
+
+    async function exportMIDI() {
+      const synth = new Tone.Synth().toDestination();
+      const now = Tone.now();
+      let currentTime = now;
+
+      for (const key in tracks) {
+        const t = tracks[key];
+        const intervals = getIntervals(t.times);
+        intervals.forEach(d => {
+          synth.triggerAttackRelease(Tone.Frequency(t.midi, "midi"), d, currentTime);
+          currentTime += d;
+        });
+      }
+
+      // Optionally, alert or display message
+      alert("MIDI playback simulated using Tone.js. Actual MIDI file download requires MIDI writer code (e.g., jsmidgen). Want to add that?");
+    }
   </script>
 </body>
 </html>
-

@@ -1,1 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rhythm Notation Tool</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    h1 { margin-bottom: 10px; }
+    .track { margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    pre { background: #f0f0f0; padding: 10px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Rhythm Notation Tool</h1>
+  <p>Press <strong>Space</strong> (Track 1), <strong>CapsLock</strong> (Track 2), or <strong>Enter</strong> (Track 3) to record rhythm.<br>
+     Press <strong>Backspace</strong> to reset.</p>
 
+  <div id="output"></div>
+
+  <script>
+    const tracks = {
+      'Space': { times: [], name: "Track 1" },
+      'CapsLock': { times: [], name: "Track 2" },
+      'Enter': { times: [], name: "Track 3" }
+    };
+
+    const durations = [1, 0.5, 0.33, 0.25, 0.125];
+
+    function closestDuration(val) {
+      return durations.reduce((prev, curr) =>
+        Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev
+      );
+    }
+
+    function getIntervals(times) {
+      let intervals = [];
+      for (let i = 1; i < times.length; i++) {
+        let raw = (times[i] - times[i - 1]) / 1000; // seconds
+        intervals.push(closestDuration(raw));
+      }
+      return intervals;
+    }
+
+    function renderOutput() {
+      let out = "";
+      for (const key in tracks) {
+        const t = tracks[key];
+        const intervals = getIntervals(t.times);
+        out += `<div class="track"><strong>${t.name}</strong><br><pre>${intervals.join(' - ') || 'No input yet'}</pre></div>`;
+      }
+      document.getElementById("output").innerHTML = out;
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.code;
+      if (key === "Backspace") {
+        for (const k in tracks) tracks[k].times = [];
+        renderOutput();
+        return;
+      }
+
+      if (tracks[key]) {
+        const now = performance.now();
+        tracks[key].times.push(now);
+        renderOutput();
+      }
+    });
+  </script>
+</body>
+</html>
